@@ -53,7 +53,15 @@ docker exec -it spark-master /opt/spark/bin/spark-submit \
 /opt/spark-apps/bronze/traffic_bronze_ingest.py
 ```
 
-Get into: http://localhost:9001/ to check the results.
+Get into: http://localhost:9001/ to check the results. There is a `raw/` folder in bronze bucket.
+
+### TODO
+
+**Next step:** Silver Layer, Gold Layer
+
+Reference to get idea:
+- [TraffictoSilverLayer](https://github.com/Ren294/SmartTraffic_Lakehouse_for_HCMC/blob/main/spark/apps/streaming/TrafficDataToSilverLayer.py)
+- [Gold Layer Processing](https://github.com/Ren294/SmartTraffic_Lakehouse_for_HCMC/tree/main/spark/apps/gold)
 
 ## Data Source
 
