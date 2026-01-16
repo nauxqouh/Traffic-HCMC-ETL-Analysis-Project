@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_timestamp, to_date, from_json, when
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType, ArrayType
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType, ArrayType, DecimalType
 
 # MinIO Configuration
 MINIO_ENDPOINT = "minio:9000"

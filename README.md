@@ -63,6 +63,11 @@ Reference to get idea:
 - [TraffictoSilverLayer](https://github.com/Ren294/SmartTraffic_Lakehouse_for_HCMC/blob/main/spark/apps/streaming/TrafficDataToSilverLayer.py)
 - [Gold Layer Processing](https://github.com/Ren294/SmartTraffic_Lakehouse_for_HCMC/tree/main/spark/apps/gold)
 
+⏳ **In progress:** `bronze_to_silver.py` (Just hand code, not verify and run yet). Need to discuss:
+
+1. Partition data by which? (present: road_district, date extracted from timestamp) -> If date, optimize by date group?
+2. Anything else in clean data step?
+
 ## Data Source
 
 The dataset provided describes information about a vehicle (in this case, a motorbike) moving along a specific road in Ho Chi Minh City. It includes various details about the vehicle, its owner, weather conditions, traffic status, and alerts related to the vehicle during its journey. This data can be used in traffic monitoring systems, vehicle operation analysis, or smart transportation services.
