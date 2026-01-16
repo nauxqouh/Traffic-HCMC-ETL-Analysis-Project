@@ -55,7 +55,7 @@ docker exec -it spark-master /opt/spark/bin/spark-submit \
 
 Get into: http://localhost:9001/ to check the results. There is a `raw/` folder in bronze bucket.
 
-### TODO
+### 📌 TODO
 
 **Next step:** Silver Layer, Gold Layer
 
@@ -182,7 +182,7 @@ The dataset provided describes information about a vehicle (in this case, a moto
 **Data Sample:**
 
 ```JSON
-0:{
+{
     "vehicle_id":"VH23418",
     "owner":{
         "name":"Nguyen Van L",
@@ -236,7 +236,7 @@ The dataset provided describes information about a vehicle (in this case, a moto
         "estimated_delay_minutes":0,
     },
     "alerts":[
-        0:{
+        {
             "type":"Speeding",
             "description":"Fuel level is below 20%",
             "severity":"Medium",
