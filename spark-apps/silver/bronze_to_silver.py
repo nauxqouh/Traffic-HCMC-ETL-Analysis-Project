@@ -1,6 +1,11 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_timestamp, to_date, from_json, when
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType, ArrayType, DecimalType
+from pyspark.sql.functions import (
+    col, to_timestamp, to_date, from_json, when
+)
+from pyspark.sql.types import (
+    StructType, StructField, StringType, DoubleType, 
+    LongType, BooleanType, ArrayType, DecimalType
+)
 
 # MinIO Configuration
 MINIO_ENDPOINT = "minio:9000"
@@ -8,7 +13,7 @@ MINIO_ACCESS_KEY = "admin"
 MINIO_SECRET_KEY = "password123"
 
 # Paths
-BRONZE_PATH = "s3a://bronze/raw/*.json"  # Reading all raw data
+BRONZE_PATH = "s3a://bronze/raw/*/*.json"  # Reading all raw data
 SILVER_PATH = "s3a://silver/traffic_data"
 
 def create_spark_session():
@@ -20,6 +25,14 @@ def create_spark_session():
         .config("spark.hadoop.fs.s3a.path.style.access", "true") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .config("spark.hadoop.fs.s3a.connection.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.socket.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.connection.establish.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.read.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.commit.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.threads.keepalivetime", "60") \
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
+        .config("spark.hadoop.fs.s3a.multipart.purge.age", "86400") \
+        .config("spark.hadoop.fs.s3a.assumed.role.session.duration", "1800") \
         .getOrCreate()
 
 def get_schema():
@@ -125,7 +138,8 @@ def get_validation_condition():
         col("road_street").isNotNull(),
         col("road_district").isNotNull(),
 
-        (col("speed_kmph").isNull() | (col("speed_kmph") >= 0)),
+        (col("speed_kmph").isNull() | ((col("speed_kmph") >= 0) & (col("speed_kmph") < 300))),
+        
         (col("vehicle_length").isNull() | (col("vehicle_length") >= 0)),
         (col("vehicle_width").isNull() | (col("vehicle_width") >= 0)),
         (col("vehicle_height").isNull() | (col("vehicle_height") >= 0)),
@@ -135,9 +149,6 @@ def get_validation_condition():
         (col("passenger_count").isNull() | (col("passenger_count") >= 0)),
         (col("rpm").isNull() | (col("rpm") >= 0)),
 
-        col("eta").isNotNull() & 
-        (col("eta") >= col("timestamp")),
-
         (col("latitude").isNull() | (col("latitude").between(-90, 90))) &
         (col("longitude").isNull() | (col("longitude").between(-180, 180))),
     ]
@@ -145,7 +156,7 @@ def get_validation_condition():
 def clean_data(df):
     return df.dropDuplicates(["vehicle_id", "timestamp"])
 
-def process():
+def main():
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
@@ -155,13 +166,18 @@ def process():
 
     # 1. Transformation (Flattening)
     print("Transforming and flattening data...")
+
     df_flat = transform_data(df)
 
     # 2. Cleaning & Validation
     print("Validating flattened data...")
     validation_conditions = get_validation_condition()
-    for condition in validation_conditions:
+    
+    # Initialize with the first condition
+    combined_condition = validation_conditions[0]
+    for condition in validation_conditions[1:]:
         combined_condition = combined_condition & condition
+        
     df_valid = df_flat.filter(combined_condition)
     df_invalid = df_flat.filter(~combined_condition)
 
@@ -169,19 +185,24 @@ def process():
         print(f"Found {df_invalid.count()} invalid records. Writing to bad_data...")
         df_invalid.write.mode("append").json(f"{SILVER_PATH}_bad_data")
     
-    # 3. Clean data
+    # 3. Clean duplicates
     print("Removing duplicates...")
     df_clean = clean_data(df_valid)
 
-    # 4. Write data
+    # 4. Write data with Optimized Partitioning
     print("Writing data to Silver layer (Parquet)...")
-    df_clean.write \
+    
+    # Optimization: Sort within partitions to cluster data by district physically
+    # This helps downstream jobs that filter by district even without physical district partitioning
+    df_clean \
+        .sortWithinPartitions("road_district", "timestamp") \
+        .write \
         .mode("append") \
-        .partitionBy("road_district", "date") \
+        .partitionBy("date") \
         .parquet(SILVER_PATH)
     
     print(f"Silver layer processing completed. Data written to {SILVER_PATH}")
     spark.stop()
 
 if __name__ == "__main__":
-    process()
+    main()
