@@ -163,6 +163,7 @@ def main():
     print("Reading data from Bronze layer...")
     schema = get_schema()
     df = spark.read.schema(schema).json(BRONZE_PATH)
+    # df = spark.read.schema(schema).json(BRONZE_PATH).limit(1000) # use to check saved .parquet fail.
 
     # 1. Transformation (Flattening)
     print("Transforming and flattening data...")
