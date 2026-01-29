@@ -88,12 +88,14 @@ psql -h localhost -p 5432 -U spark_user -d analytics
 
 ### 📌 TODO
 
-Try to connect power BI with postgreSQL docker!!!
+Need to check:
+
+1. Any thing new in `bronze_to_silver.py`? I have just updated some features and alias some columns.
+2. Check `fact_traffic` logic with `origin_location` and `dest_location`; also `owner`.
 
 Then:
 
-- Update `bronze_to_silver.py` again. (update missing data because of sleep :( ))
-- Update `dim_owner.py` table for gold layer.
+Run full pipeline again after fix all and double check.
 
 ## Data Sourcepy
 
