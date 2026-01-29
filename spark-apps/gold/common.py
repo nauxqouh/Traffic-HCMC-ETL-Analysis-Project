@@ -21,17 +21,25 @@ def create_spark_session(app_name):
         .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY) \
         .config("spark.hadoop.fs.s3a.path.style.access", "true") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
         .config("spark.hadoop.fs.s3a.connection.timeout", "60000") \
         .config("spark.hadoop.fs.s3a.socket.timeout", "60000") \
         .config("spark.hadoop.fs.s3a.connection.establish.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.read.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.commit.timeout", "60000") \
+        .config("spark.hadoop.fs.s3a.threads.keepalivetime", "60") \
+        .config("spark.hadoop.fs.s3a.multipart.purge.age", "86400") \
+        .config("spark.hadoop.fs.s3a.assumed.role.session.duration", "1800") \
         .config("spark.hadoop.fs.s3a.fast.upload", "true") \
         .config("spark.hadoop.fs.s3a.fast.upload.buffer", "bytebuffer") \
-        .config("spark.hadoop.fs.s3a.multipart.size", "104857600") \
-        .config("spark.hadoop.fs.s3a.threads.max", "64") \
+        .config("spark.hadoop.fs.s3a.multipart.size", "67108864") \
+        .config("spark.hadoop.fs.s3a.threads.max", "8") \
         .config("spark.sql.adaptive.enabled", "true") \
         .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
-        .config("spark.sql.shuffle.partitions", "200") \
-        .config("spark.default.parallelism", "200") \
+        .config("spark.sql.shuffle.partitions", "8") \
+        .config("spark.default.parallelism", "8") \
+        .config("spark.executor.heartbeatInterval", "60s") \
+        .config("spark.network.timeout", "300s") \
         .getOrCreate()
         
 def write_to_gold(df, table_name, mode="overwrite"):
