@@ -95,7 +95,7 @@ Need to check:
 
 Then:
 
-Run full pipeline again after fix all and double check.
+Run full pipeline again after fix all and double check tomorrow morning.
 
 ## Data Sourcepy
 
