@@ -1,11 +1,14 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    col, to_timestamp, to_date, from_json, when
+    col, to_timestamp, to_date, from_json, when, date_format,
+    input_file_name, current_timestamp, lit
 )
 from pyspark.sql.types import (
     StructType, StructField, StringType, DoubleType, 
     LongType, BooleanType, ArrayType, DecimalType
 )
+from pyspark.sql.utils import AnalysisException
+
 
 # MinIO Configuration
 MINIO_ENDPOINT = "minio:9000"
@@ -15,8 +18,10 @@ MINIO_SECRET_KEY = "password123"
 # Paths
 BRONZE_PATH = "s3a://bronze/raw/*/*.json"  # Reading all raw data
 SILVER_PATH = "s3a://silver/traffic_data"
+METADATA_PATH = "s3a://silver/_metadata/processed_files"
 
 def create_spark_session():
+    """Create optimized SparkSession for Bronze to Silver processing"""
     return SparkSession.builder \
         .appName("Traffic-Bronze-To-Silver") \
         .config("spark.hadoop.fs.s3a.endpoint", f"http://{MINIO_ENDPOINT}") \
@@ -24,15 +29,25 @@ def create_spark_session():
         .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY) \
         .config("spark.hadoop.fs.s3a.path.style.access", "true") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
         .config("spark.hadoop.fs.s3a.connection.timeout", "60000") \
         .config("spark.hadoop.fs.s3a.socket.timeout", "60000") \
         .config("spark.hadoop.fs.s3a.connection.establish.timeout", "60000") \
         .config("spark.hadoop.fs.s3a.read.timeout", "60000") \
         .config("spark.hadoop.fs.s3a.commit.timeout", "60000") \
         .config("spark.hadoop.fs.s3a.threads.keepalivetime", "60") \
-        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
         .config("spark.hadoop.fs.s3a.multipart.purge.age", "86400") \
         .config("spark.hadoop.fs.s3a.assumed.role.session.duration", "1800") \
+        .config("spark.hadoop.fs.s3a.fast.upload", "true") \
+        .config("spark.hadoop.fs.s3a.fast.upload.buffer", "bytebuffer") \
+        .config("spark.hadoop.fs.s3a.multipart.size", "67108864") \
+        .config("spark.hadoop.fs.s3a.threads.max", "8") \
+        .config("spark.sql.adaptive.enabled", "true") \
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+        .config("spark.sql.shuffle.partitions", "8") \
+        .config("spark.default.parallelism", "8") \
+        .config("spark.executor.heartbeatInterval", "60s") \
+        .config("spark.network.timeout", "300s") \
         .getOrCreate()
 
 def get_schema():
@@ -47,7 +62,7 @@ def get_schema():
                 StructField("email", StringType(), True)
             ]), True)
         ]), True),
-        StructField("speed_kmph", DecimalType(10, 2), True),
+        StructField("speed_kmph", DoubleType(), True),
         StructField("road", StructType([
             StructField("street", StringType(), True),
             StructField("district", StringType(), True),
@@ -55,15 +70,15 @@ def get_schema():
         ]), True),
         StructField("timestamp", StringType(), True),
         StructField("vehicle_size", StructType([
-            StructField("length_meters", DecimalType(10, 2), True),
-            StructField("width_meters", DecimalType(10, 2), True),
-            StructField("height_meters", DecimalType(10, 2), True)
+            StructField("length_meters", DoubleType(), True),
+            StructField("width_meters", DoubleType(), True),
+            StructField("height_meters", DoubleType(), True)
         ]), True),
         StructField("vehicle_type", StringType(), True),
         StructField("vehicle_classification", StringType(), True),
         StructField("coordinates", StructType([
-            StructField("latitude", DecimalType(10, 2), True),
-            StructField("longitude", DecimalType(10, 2), True)
+            StructField("latitude", DoubleType(), True),
+            StructField("longitude", DoubleType(), True)
         ]), True),
         StructField("engine_status", StructType([
             StructField("is_running", BooleanType(), True),
@@ -72,10 +87,10 @@ def get_schema():
         ]), True),
         StructField("fuel_level_percentage", LongType(), True),
         StructField("passenger_count", LongType(), True),
-        StructField("internal_temperature_celsius", DecimalType(10, 2), True),
+        StructField("internal_temperature_celsius", DoubleType(), True),
         StructField("weather_condition", StructType([
-            StructField("temperature_celsius", DecimalType(10, 2), True),
-            StructField("humidity_percentage", DecimalType(10, 2), True),
+            StructField("temperature_celsius", DoubleType(), True),
+            StructField("humidity_percentage", DoubleType(), True),
             StructField("condition", StringType(), True)
         ]), True),
         StructField("traffic_status", StructType([
@@ -156,53 +171,108 @@ def get_validation_condition():
 def clean_data(df):
     return df.dropDuplicates(["vehicle_id", "timestamp"])
 
+def read_processed_files(spark):
+    try:
+        return spark.read.parquet(METADATA_PATH)
+    except AnalysisException:
+        schema = StructType([
+            StructField("file_path", StringType(), True),
+            StructField("processed_at", StringType(), True)
+        ])
+        return spark.createDataFrame([], schema)
+
 def main():
+    import os
+    import time
+    from datetime import datetime
+    
+    print("="*60)
+    print("Starting Bronze to Silver ETL")
+    print(f"Timestamp: {datetime.now()}")
+    print("="*60)
+    
+    start_time = time.time()
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
-    print("Reading data from Bronze layer...")
+    print("\n[1/5] Reading data from Bronze layer...")
+    read_start = time.time()
     schema = get_schema()
-    df = spark.read.schema(schema).json(BRONZE_PATH)
-    # df = spark.read.schema(schema).json(BRONZE_PATH).limit(1000) # use to check saved .parquet fail.
+    
+    df = spark.read \
+        .option("multiline", "true") \
+        .schema(schema) \
+        .json(BRONZE_PATH)
+    read_time = time.time() - read_start
+    print(f"✓ Data read completed ({read_time:.2f}s)")
+    df = df.withColumn("date", date_format(col("timestamp"), "yyyy-MM-dd"))
+    df.printSchema()
 
-    # 1. Transformation (Flattening)
-    print("Transforming and flattening data...")
+    # 2. Transformation (Flattening)
+    print("\n[2/5] Transforming and flattening data...")
+    transform_start = time.time()
+    df_flat = transform_data(df).persist()
+    transform_time = time.time() - transform_start
+    print(f"✓ Transformation completed ({transform_time:.2f}s)")
 
-    df_flat = transform_data(df)
-
-    # 2. Cleaning & Validation
-    print("Validating flattened data...")
+    # 3. Validation
+    print("\n[3/5] Validating data...")
+    validate_start = time.time()
     validation_conditions = get_validation_condition()
     
     # Initialize with the first condition
     combined_condition = validation_conditions[0]
     for condition in validation_conditions[1:]:
         combined_condition = combined_condition & condition
-        
+    print(f"✓ Get validation conditions completed.")
+    
     df_valid = df_flat.filter(combined_condition)
     df_invalid = df_flat.filter(~combined_condition)
-
-    if df_invalid.count() > 0:
-        print(f"Found {df_invalid.count()} invalid records. Writing to bad_data...")
+    invalid_count = df_invalid.count()
+    validate_time = time.time() - validate_start
+    print(f"✓ Validation completed ({validate_time:.2f}s)")
+    print(f"  Invalid: {invalid_count:,}")
+    
+    if invalid_count > 0:
+        print(f"\n⚠️  Writing {invalid_count} invalid records to bad_data...")
         df_invalid.write.mode("append").json(f"{SILVER_PATH}_bad_data")
     
-    # 3. Clean duplicates
-    print("Removing duplicates...")
+    # 4. Clean duplicates
+    print("\n[4/5] Removing duplicates...")
+    clean_start = time.time()
     df_clean = clean_data(df_valid)
+    clean_time = time.time() - clean_start
+    print(f"✓ Deduplication completed ({clean_time:.2f}s)")
 
-    # 4. Write data with Optimized Partitioning
-    print("Writing data to Silver layer (Parquet)...")
+    # 5. Write data with Optimized Partitioning
+    print("\n[5/5] Writing data to Silver layer (Parquet)...")
+    write_start = time.time()
     
-    # Optimization: Sort within partitions to cluster data by district physically
-    # This helps downstream jobs that filter by district even without physical district partitioning
     df_clean \
-        .sortWithinPartitions("road_district", "timestamp") \
+        .repartition("date") \
         .write \
         .mode("append") \
         .partitionBy("date") \
         .parquet(SILVER_PATH)
     
-    print(f"Silver layer processing completed. Data written to {SILVER_PATH}")
+    write_time = time.time() - write_start
+    total_time = time.time() - start_time
+
+    print(f"✓ Write completed ({write_time:.2f}s)")
+    print("\n" + "="*60)
+    print("Silver Layer Processing Completed Successfully")
+    print(f"Total execution time: {total_time:.2f}s ({total_time/60:.2f} min)")
+    print(f"  - Read: {read_time:.2f}s")
+    print(f"  - Transform: {transform_time:.2f}s")
+    print(f"  - Validate: {validate_time:.2f}s")
+    print(f"  - Clean: {clean_time:.2f}s")
+    print(f"  - Write: {write_time:.2f}s")
+    print(f"Output path: {SILVER_PATH}")
+    print("="*60)
+    
+    df_test = spark.read.parquet("s3a://silver/traffic_data/")
+    df_test.select("date").distinct().show()
+    
     spark.stop()
 
 if __name__ == "__main__":
