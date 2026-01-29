@@ -88,11 +88,14 @@ psql -h localhost -p 5432 -U spark_user -d analytics
 
 ### 📌 TODO
 
-`Gold layer` next!!
+Try to connect power BI with postgreSQL docker!!!
 
+Then:
 
+- Update `bronze_to_silver.py` again. (update missing data because of sleep :( ))
+- Update `dim_owner.py` table for gold layer.
 
-## Data Source
+## Data Sourcepy
 
 The dataset provided describes information about a vehicle (in this case, a motorbike) moving along a specific road in Ho Chi Minh City. It includes various details about the vehicle, its owner, weather conditions, traffic status, and alerts related to the vehicle during its journey. This data can be used in traffic monitoring systems, vehicle operation analysis, or smart transportation services.
 
