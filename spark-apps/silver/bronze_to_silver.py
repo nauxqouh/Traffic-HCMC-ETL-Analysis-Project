@@ -231,7 +231,7 @@ def main():
     invalid_count = df_invalid.count()
     validate_time = time.time() - validate_start
     print(f"✓ Validation completed ({validate_time:.2f}s)")
-    print(f"  Invalid: {invalid_count:,}")
+    print(f"  Valid: {df_flat.count() - invalid_count:,} | Invalid: {invalid_count:,}")
     
     if invalid_count > 0:
         print(f"\n⚠️  Writing {invalid_count} invalid records to bad_data...")
@@ -248,6 +248,8 @@ def main():
     print("\n[5/5] Writing data to Silver layer (Parquet)...")
     write_start = time.time()
     
+    df_flat.unpersist()
+    
     df_clean \
         .repartition("date") \
         .write \
@@ -257,7 +259,7 @@ def main():
     
     write_time = time.time() - write_start
     total_time = time.time() - start_time
-
+    
     print(f"✓ Write completed ({write_time:.2f}s)")
     print("\n" + "="*60)
     print("Silver Layer Processing Completed Successfully")

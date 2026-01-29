@@ -62,6 +62,15 @@ docker exec -it spark-master /opt/spark/bin/spark-submit \
 /opt/spark-apps/silver/bronze_to_silver.py
 ```
 
+```bash
+docker exec -it spark-master /opt/spark/bin/spark-submit \
+--master spark://spark-master:7077 \
+--executor-memory 4g \
+--driver-memory 2g \
+--conf spark.executor.memoryOverhead=1g \
+/opt/spark-apps/gold/silver_to_gold.py
+```
+
 Get into: http://localhost:9001/ to check the results.
 
 ### 📌 TODO
