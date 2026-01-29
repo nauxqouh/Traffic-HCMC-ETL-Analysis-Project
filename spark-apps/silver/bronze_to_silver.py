@@ -4,7 +4,7 @@ from pyspark.sql.functions import (
     input_file_name, current_timestamp, lit
 )
 from pyspark.sql.types import (
-    StructType, StructField, StringType, DoubleType, 
+    StructType, StructField, StringType, DoubleType, TimestampType,
     LongType, BooleanType, ArrayType, DecimalType
 )
 from pyspark.sql.utils import AnalysisException
@@ -68,7 +68,7 @@ def get_schema():
             StructField("district", StringType(), True),
             StructField("city", StringType(), True)
         ]), True),
-        StructField("timestamp", StringType(), True),
+        StructField("timestamp", TimestampType(), True),
         StructField("vehicle_size", StructType([
             StructField("length_meters", DoubleType(), True),
             StructField("width_meters", DoubleType(), True),
@@ -93,6 +93,14 @@ def get_schema():
             StructField("humidity_percentage", DoubleType(), True),
             StructField("condition", StringType(), True)
         ]), True),
+        StructField("estimated_time_of_arrival", StructType([
+            StructField("destination", StructType([
+                StructField("street", StringType(), True),
+                StructField("district", StringType(), True),
+                StructField("city", StringType(), True)
+            ]), True),
+            StructField("eta", TimestampType(), True),
+        ]), True),
         StructField("traffic_status", StructType([
             StructField("congestion_level", StringType(), True),
             StructField("estimated_delay_minutes", LongType(), True)
@@ -110,6 +118,8 @@ def transform_data(df):
         col("vehicle_id"),
         col("owner.name").alias("owner_name"),
         col("owner.license_number").alias("license_number"),
+        col("owner.contact_info.phone").alias("phone"),
+        col("owner.contact_info.email").alias("email"),
         col("vehicle_type"),
         col("vehicle_classification"),
         col("speed_kmph"),
@@ -136,6 +146,11 @@ def transform_data(df):
         col("weather_condition.condition").alias("weather_condition"),
         col("weather_condition.temperature_celsius").alias("temperature"),
         col("weather_condition.humidity_percentage").alias("humidity"),
+        # Estimated time of arrival
+        col("estimated_time_of_arrival.destination.street").alias("destination_street"),
+        col("estimated_time_of_arrival.destination.district").alias("destination_district"),
+        col("estimated_time_of_arrival.destination.city").alias("destination_city"),
+        col("estimated_time_of_arrival.eta").alias("eta"),
         # Traffic
         col("traffic_status.congestion_level").alias("congestion_level"),
         col("traffic_status.estimated_delay_minutes").alias("estimated_delay_minutes"),
@@ -163,7 +178,10 @@ def get_validation_condition():
 
         (col("passenger_count").isNull() | (col("passenger_count") >= 0)),
         (col("rpm").isNull() | (col("rpm") >= 0)),
-
+        
+        col('eta').isNotNull() &
+        (col('eta') >= col('timestamp')),
+        
         (col("latitude").isNull() | (col("latitude").between(-90, 90))) &
         (col("longitude").isNull() | (col("longitude").between(-180, 180))),
     ]
@@ -205,7 +223,7 @@ def main():
         .json(BRONZE_PATH)
     read_time = time.time() - read_start
     print(f"✓ Data read completed ({read_time:.2f}s)")
-    df = df.withColumn("date", date_format(col("timestamp"), "yyyy-MM-dd"))
+    # df = df.withColumn("date", date_format(col("timestamp"), "yyyy-MM-dd"))
     df.printSchema()
 
     # 2. Transformation (Flattening)
