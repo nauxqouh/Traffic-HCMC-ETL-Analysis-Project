@@ -2,7 +2,7 @@ from pyspark.sql.functions import col, when, avg, count
 from pyspark.sql.types import FloatType, IntegerType
 from common import write_to_postgres, write_to_gold
 
-def process_fact_traffic(df_silver, dim_road, dim_weather):
+def process_fact_traffic(df_silver, dim_road, dim_weather, dim_owner):
 
     print("Processing Fact_Traffic with Joins...")
     # Join with dim_road to get road_id
@@ -22,11 +22,19 @@ def process_fact_traffic(df_silver, dim_road, dim_weather):
         (df_joined.humidity.cast(FloatType()) == dim_weather.humidity),
         "left"
     ).drop(dim_weather.weather_condition).drop(dim_weather.temperature).drop(dim_weather.humidity)
+    
+    # Join with dim_owner to get owner_id
+    df_joined = df_joined.join(
+        dim_owner,
+        (df_joined.email == dim_weather.email),
+        "left"
+    ).drop(dim_owner.email)
 
     # Select and cast measures
     df_fact = df_joined.select(
         col("timestamp").alias("time_id"),
-        col("vehicle_id"), 
+        col("vehicle_id"),
+        col("owner_id"), 
         col("road_id"),
         col("weather_id"),
         col("speed_kmph").cast(FloatType()),
@@ -39,7 +47,8 @@ def process_fact_traffic(df_silver, dim_road, dim_weather):
             .when(col("congestion_level") == "Heavy", 4)
             .otherwise(0).cast(IntegerType()).alias("congestion_score"
         ),
-        col("estimated_delay_minutes").cast(IntegerType())
+        col("estimated_delay_minutes").cast(IntegerType()),
+        col("eta").alias("destination_eta")
     )
 
     write_to_gold(df_fact, "fact_traffic", "append")
