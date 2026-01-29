@@ -9,8 +9,8 @@ def process_dim_owner(df_silver):
         "email"
     )
     dim_owner = df_owner \
+        .dropDuplicates(["email"]) \
         .withColumn("owner_id", monotonically_increasing_id()) \
-        .dropDuplicates(["email"])
 
     write_to_gold(dim_owner, "dim_owner", "overwrite")
     write_to_postgres(dim_owner, "dim_owner", "overwrite")

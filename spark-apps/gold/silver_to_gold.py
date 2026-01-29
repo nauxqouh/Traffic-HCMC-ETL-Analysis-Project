@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from common import create_spark_session, SILVER_PATH
 from dim_time import process_dim_time
 from dim_vehicle import process_dim_vehicle
-from dim_road import process_dim_road
+from dim_location import process_dim_location
 from dim_weather import process_dim_weather
 from fact_traffic import process_fact_traffic
 
@@ -40,7 +40,7 @@ def main():
         # Dimension tables
         process_dim_time(df_silver)
         process_dim_vehicle(df_silver)
-        dim_road = process_dim_road(df_silver)
+        dim_location = process_dim_location(df_silver)
         dim_weather = process_dim_weather(df_silver)
         
         dim_time = time.time() - dim_start
@@ -49,7 +49,7 @@ def main():
         # Fact table
         print("\n[3/6] Processing Fact Table...")
         fact_start = time.time()
-        process_fact_traffic(df_silver, dim_road, dim_weather)
+        process_fact_traffic(df_silver, dim_location, dim_weather)
         fact_time = time.time() - fact_start
         print(f"✓ Fact table completed ({fact_time:.2f}s)")
         

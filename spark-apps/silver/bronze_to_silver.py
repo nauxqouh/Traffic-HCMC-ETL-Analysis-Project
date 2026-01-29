@@ -135,8 +135,8 @@ def transform_data(df):
         col("vehicle_size.width_meters").alias("vehicle_width"),
         col("vehicle_size.height_meters").alias("vehicle_height"),
         # Coordinates
-        col("coordinates.latitude"),
-        col("coordinates.longitude"),
+        col("coordinates.latitude").alias("latitude"),
+        col("coordinates.longitude").alias("longtitude"),
         # Engine
         col("engine_status.rpm").alias("rpm"),
         col("engine_status.oil_pressure").alias("oil_pressure"),
