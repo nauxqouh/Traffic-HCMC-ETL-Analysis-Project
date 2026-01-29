@@ -73,9 +73,23 @@ docker exec -it spark-master /opt/spark/bin/spark-submit \
 
 Get into: http://localhost:9001/ to check the results.
 
+Check postgresql:
+
+```bash
+docker exec -it postgres psql -U spark_user -d analytics
+```
+
+or
+
+```bash
+psql -h localhost -p 5432 -U spark_user -d analytics
+```
+
+
 ### 📌 TODO
 
 `Gold layer` next!!
+
 
 
 ## Data Source
