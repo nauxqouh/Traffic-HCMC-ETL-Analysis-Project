@@ -34,10 +34,11 @@ def process_fact_traffic(df_silver, dim_road, dim_weather):
         col("fuel_level_percentage").cast(FloatType()),
         col("passenger_count").cast(IntegerType()),
         when(col("congestion_level") == "Low", 1)
-        .when(col("congestion_level") == "Moderate", 2)
-        .when(col("congestion_level") == "High", 3)
-        .when(col("congestion_level") == "Heavy", 4)
-        .otherwise(0).cast(IntegerType()).alias("congestion_score"),
+            .when(col("congestion_level") == "Moderate", 2)
+            .when(col("congestion_level") == "High", 3)
+            .when(col("congestion_level") == "Heavy", 4)
+            .otherwise(0).cast(IntegerType()).alias("congestion_score"
+        ),
         col("estimated_delay_minutes").cast(IntegerType())
     )
 
