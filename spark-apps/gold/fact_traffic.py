@@ -102,7 +102,7 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
         .agg(
             avg("speed_kmph").alias("avg_speed"),
             avg("congestion_score").alias("avg_congestion"),
-            count("vehicle_id").alias("traffic_count")
+            count("traffic_vehicle_id").alias("traffic_count")
         )
     write_to_gold(df_agg, "fact_traffic_hourly_agg", "overwrite")
     write_to_postgres(df_agg, "fact_traffic_hourly_agg", "overwrite")
