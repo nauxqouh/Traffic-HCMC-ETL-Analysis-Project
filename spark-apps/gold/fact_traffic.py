@@ -98,7 +98,7 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
     
     # Aggregation: Hourly Average Speed and Traffic Count per Road
     print("Processing Fact_Traffic Aggregation (Hourly Metrics)...")
-    df_agg = df_fact.groupBy("org_location_id", "time_id") \
+    df_agg = df_fact.groupBy("cur_location_id", "time_id") \
         .agg(
             avg("speed_kmph").alias("avg_speed"),
             avg("congestion_score").alias("avg_congestion"),
