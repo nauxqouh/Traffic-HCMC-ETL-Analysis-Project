@@ -39,7 +39,7 @@ def main():
         
         # Dimension tables
         process_dim_time(df_silver)
-        process_dim_vehicle(df_silver)
+        dim_vehicle = process_dim_vehicle(df_silver)
         dim_location = process_dim_location(df_silver)
         dim_weather = process_dim_weather(df_silver)
         
@@ -49,7 +49,7 @@ def main():
         # Fact table
         print("\n[3/6] Processing Fact Table...")
         fact_start = time.time()
-        process_fact_traffic(df_silver, dim_location, dim_weather)
+        process_fact_traffic(df_silver, dim_location, dim_weather, dim_vehicle)
         fact_time = time.time() - fact_start
         print(f"✓ Fact table completed ({fact_time:.2f}s)")
         
