@@ -16,7 +16,7 @@ MINIO_ACCESS_KEY = "admin"
 MINIO_SECRET_KEY = "password123"
 
 # Paths
-BRONZE_PATH = "s3a://bronze/raw/*/*.json"  # Reading all raw data
+BRONZE_PATH = "s3a://bronze/raw/2026-01-15/traffic_data_1.json"  # Reading all raw data
 SILVER_PATH = "s3a://silver/traffic_data"
 METADATA_PATH = "s3a://silver/_metadata/processed_files"
 
@@ -245,7 +245,7 @@ def main():
     print(f"✓ Get validation conditions completed.")
     
     df_valid = df_flat.filter(combined_condition)
-    df_invalid = df_flat.filter(~combined_condition)
+    df_invalid = df_flat.filter(~combined_condition).persist()
     invalid_count = df_invalid.count()
     validate_time = time.time() - validate_start
     print(f"✓ Validation completed ({validate_time:.2f}s)")
@@ -266,6 +266,7 @@ def main():
     print("\n[5/5] Writing data to Silver layer (Parquet)...")
     write_start = time.time()
     
+    df_invalid.unpersist()
     df_flat.unpersist()
     
     df_clean \

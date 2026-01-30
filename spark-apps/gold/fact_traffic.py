@@ -1,29 +1,49 @@
-from pyspark.sql.functions import col, when, avg, count
+from pyspark.sql.functions import col, when, avg, count, date_format
 from pyspark.sql.types import FloatType, IntegerType
 from common import write_to_postgres, write_to_gold
 
-def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner):
+def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_vehicle):
 
     print("Processing Fact_Traffic with Joins...")
-    dim_loc_origin = dim_location.alias("dim_loc_origin")
-    dim_loc_dest   = dim_location.alias("dim_loc_dest")
-
-    # Join with dim_road to get road_id
-    df_joined = df_silver.join(
-        dim_loc_origin,
-        (df_silver.road_street == dim_loc_origin.street) & 
-        (df_silver.road_district == dim_loc_origin.district) & 
-        (df_silver.road_city == dim_loc_origin.city),
-        "left"
-    ).drop(dim_loc_origin.street).drop(dim_loc_origin.district).drop(dim_loc_origin.city)
     
     df_joined = df_silver.join(
-        dim_loc_dest,
-        (df_silver.destination_street == dim_loc_dest.street) & 
-        (df_silver.destination_district == dim_loc_dest.district) & 
-        (df_silver.destination_city == dim_loc_dest.city),
+        dim_owner,
+        (df_silver.owner_name == dim_owner.owner_name) &
+        (df_silver.phone == dim_owner.phone) &
+        (df_silver.email == dim_owner.email),
         "left"
-    ).drop(dim_loc_dest.street).drop(dim_loc_dest.district).drop(dim_loc_dest.city)
+    ).drop(dim_owner.owner_name).drop(dim_owner.phone).drop(dim_owner.email)
+    
+    # curr_location
+    cur_loc = dim_location.select(
+        col("location_id").alias("cur_location_id"),
+        col("street").alias("cur_street"),
+        col("district").alias("cur_district"),
+        col("city").alias("cur_city")
+    )   
+
+    df_joined  = df_joined .join(
+        cur_loc,
+        ( df_joined.road_street == cur_loc.cur_street) &
+        (df_joined.road_district == cur_loc.cur_district) &
+        (df_joined.road_city == cur_loc.cur_city),
+        "left"
+    ).drop(cur_loc.cur_street).drop(cur_loc.cur_district).drop(cur_loc.cur_city)
+    
+    # dest_location
+    dest_loc = dim_location.select(
+        col("location_id").alias("dest_location_id"),
+        col("street").alias("dest_street"),
+        col("district").alias("dest_district"),
+        col("city").alias("dest_city")
+    )
+    df_joined = df_joined.join(
+        dest_loc,
+        (df_joined.destination_street == dest_loc.dest_street) &
+        (df_joined.destination_district == dest_loc.dest_district) &
+        (df_joined.destination_city == dest_loc.dest_city),
+        "left"
+    ).drop(dest_loc.dest_street).drop(dest_loc.dest_district).drop(dest_loc.dest_city)
     
     # Join with dim_weather to get weather_id
     df_joined = df_joined.join(
@@ -34,20 +54,26 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner):
         "left"
     ).drop(dim_weather.weather_condition).drop(dim_weather.temperature).drop(dim_weather.humidity)
     
-    # Join with dim_owner to get owner_id
+    # Join with dim_vehicle to get vehicle_id
     df_joined = df_joined.join(
-        dim_owner,
-        (df_joined.email == dim_owner.email),
+        dim_vehicle,
+        (df_joined.license_number == dim_vehicle.license_number),
         "left"
-    ).drop(dim_owner.email).drop(dim_owner.phone).drop(dim_owner.owner_name)
+    ) \
+        .drop(dim_vehicle.license_number) \
+        .drop(dim_vehicle.vehicle_type) \
+        .drop(dim_vehicle.vehicle_classification) \
+        .drop(dim_vehicle.vehicle_length) \
+        .drop(dim_vehicle.vehicle_width) \
+        .drop(dim_vehicle.vehicle_height)
 
     # Select and cast measures
     df_fact = df_joined.select(
-        col("timestamp").alias("time_id"),
-        col("vehicle_id"),
+        col("vehicle_id").alias("traffic_vehicle_id"),
+        col("dim_vehicle.vehicle_id").alias("vehicle_id"),
         col("owner_id"), 
-        col("dim_loc_origin.location_id").alias("ori_location_id"),
-        col("dim_loc_dest.location_id").alias("des_location_id"),
+        col("cur_location_id"),
+        col("dest_location_id"),
         col("weather_id"),
         col("speed_kmph").cast(FloatType()),
         col("rpm").cast(IntegerType()),
@@ -61,7 +87,11 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner):
         ),
         col("estimated_delay_minutes").cast(IntegerType()),
         col("eta").alias("destination_eta")
-    )
+        ) \
+        .withColumn(
+            "time_id",
+            date_format(col("timestamp"), "yyyyMMddHH").cast(IntegerType())
+        )
 
     write_to_gold(df_fact, "fact_traffic", "append")
     write_to_postgres(df_fact, "fact_traffic", "append")
