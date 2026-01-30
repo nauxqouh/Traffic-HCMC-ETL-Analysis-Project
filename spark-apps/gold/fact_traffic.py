@@ -16,7 +16,7 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
     
     # curr_location
     cur_loc = dim_location.select(
-        col("location_id").alias("cur_location_id"),
+        col("location_sk").alias("cur_location_sk"),
         col("street").alias("cur_street"),
         col("district").alias("cur_district"),
         col("city").alias("cur_city")
@@ -32,7 +32,7 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
     
     # dest_location
     dest_loc = dim_location.select(
-        col("location_id").alias("dest_location_id"),
+        col("location_sk").alias("dest_location_sk"),
         col("street").alias("dest_street"),
         col("district").alias("dest_district"),
         col("city").alias("dest_city")
@@ -72,9 +72,9 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
         col("vehicle_id").alias("traffic_vehicle_id"),
         col("vehicle_sk"),
         col("owner_sk"), 
-        col("cur_location_id"),
-        col("dest_location_id"),
-        col("weather_id"),
+        col("cur_location_sk"),
+        col("dest_location_sk"),
+        col("weather_sk"),
         col("speed_kmph").cast(FloatType()),
         col("rpm").cast(IntegerType()),
         col("fuel_level_percentage").cast(FloatType()),
@@ -89,7 +89,7 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
         col("eta").alias("destination_eta")
         ) \
         .withColumn(
-            "time_id",
+            "time_sk",
             date_format(col("timestamp"), "yyyyMMddHH").cast(IntegerType())
         )
 
@@ -98,7 +98,7 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
     
     # Aggregation: Hourly Average Speed and Traffic Count per Road
     print("Processing Fact_Traffic Aggregation (Hourly Metrics)...")
-    df_agg = df_fact.groupBy("cur_location_id", "time_id") \
+    df_agg = df_fact.groupBy("cur_location_sk", "time_sk") \
         .agg(
             avg("speed_kmph").alias("avg_speed"),
             avg("congestion_score").alias("avg_congestion"),
