@@ -70,8 +70,8 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
     # Select and cast measures
     df_fact = df_joined.select(
         col("vehicle_id").alias("traffic_vehicle_id"),
-        col("dim_vehicle.vehicle_id").alias("vehicle_id"),
-        col("owner_id"), 
+        col("vehicle_sk"),
+        col("owner_sk"), 
         col("cur_location_id"),
         col("dest_location_id"),
         col("weather_id"),

@@ -25,7 +25,7 @@ def process_dim_vehicle(df_silver):
         
     dim_vehicle = df_vehicle \
         .dropDuplicates(["license_number"]) \
-        .withColumn("vehicle_id", monotonically_increasing_id())
+        .withColumn("vehicle_sk", monotonically_increasing_id())
     
     write_to_gold(dim_vehicle, "dim_vehicle", "overwrite")
     write_to_postgres(dim_vehicle, "dim_vehicle", "overwrite")
