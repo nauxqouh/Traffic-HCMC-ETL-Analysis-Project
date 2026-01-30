@@ -68,10 +68,15 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
         .drop(dim_vehicle.vehicle_height)
 
     # Select and cast measures
-    df_fact = df_joined.select(
+    df_fact = df_joined.withColumn(
+        "time_sk",
+        date_format(col("timestamp"), "yyyyMMddHH").cast(IntegerType())
+    )\
+    .select(
         col("vehicle_id").alias("traffic_vehicle_id"),
         col("vehicle_sk"),
         col("owner_sk"), 
+        col("time_sk"),
         col("cur_location_sk"),
         col("dest_location_sk"),
         col("weather_sk"),
@@ -87,11 +92,8 @@ def process_fact_traffic(df_silver, dim_location, dim_weather, dim_owner, dim_ve
         ),
         col("estimated_delay_minutes").cast(IntegerType()),
         col("eta").alias("destination_eta")
-        ) \
-        .withColumn(
-            "time_sk",
-            date_format(col("timestamp"), "yyyyMMddHH").cast(IntegerType())
-        )
+    )
+    
 
     write_to_gold(df_fact, "fact_traffic", "append")
     write_to_postgres(df_fact, "fact_traffic", "append")

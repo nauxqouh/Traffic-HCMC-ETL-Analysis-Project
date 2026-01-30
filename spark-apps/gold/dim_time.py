@@ -10,6 +10,7 @@ def process_dim_time(df_silver):
             "time_sk",
             date_format(col("timestamp"), "yyyyMMddHH").cast(IntegerType())
         ) \
+        .dropDuplicates(["time_sk"]) \
         .withColumn("date", to_timestamp(col("timestamp"))) \
         .select(
             col("time_id"),
